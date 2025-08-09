@@ -2,6 +2,8 @@ from argparse import ArgumentParser
 from requests import get
 from os.path import isfile
 from threading import Thread
+from datetime import datetime
+from time import time
 
 parser = ArgumentParser(description="PyFuzz: a web service fuzzing tool")
 
@@ -20,6 +22,9 @@ def split_list(lst, n):
     k, m = divmod(len(lst), n)
     return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
 
+def timestamp():
+    return datetime.now().strftime("[%Y-%m-%d %H:%M:%S")
+
 def fuzz_url(url, word):
     fuzzed_url = url.replace("FUZZ", word)
     try:
@@ -28,16 +33,16 @@ def fuzz_url(url, word):
         if length in EXCLUDE_LEN:
             return
         if response.status_code in INCLUDE_SC:
-            print(f"[+] Found: {fuzzed_url} (Status: {response.status_code}, Length: {length})")
+            print(f"[{timestamp()}] [+] Found: {fuzzed_url} (Status: {response.status_code}, Length: {length})")
             FOUND_LIST.append({"url": fuzzed_url, "status_code": response.status_code, "length": length})
         else:
-            print(f"[-] Not found: {fuzzed_url} (Status: {response.status_code}, Length: {length})")
+            print(f"[{timestamp()}] [-] Not found: {fuzzed_url} (Status: {response.status_code}, Length: {length})")
     except Exception as e:
-        print(f"[!] Error accessing {fuzzed_url}: {e}")
+        print(f"[{timestamp()}] Error accessing {fuzzed_url}: {e}")
 
 def worker(url, chunk):
     for w in chunk:
-        print(f"[+] Fuzzing: {w}")
+        print(f"{timestamp()}] Fuzzing: {w}")
         fuzz_url(url, w)
 
 URL, WORDLIST, THREADS = args.url, args.wordlist, args.threads
@@ -87,7 +92,9 @@ if not words:
 wordlist_chunks = split_list(words, THREADS)
 
 # Multithreading for fuzzing
-print(f"[+] Starting fuzzing with {THREADS} threads...")
+
+start_time = time()
+print(f"{timestamp()} [+] Starting fuzzing with {THREADS} threads...")
 
 threads_list = []
 for chunk in wordlist_chunks:
@@ -95,11 +102,14 @@ for chunk in wordlist_chunks:
     threads_list.append(t)
     t.start()
 
-
 for t in threads_list:
     t.join()
 
+end_time = time()
+elapsed = end_time - start_time
+
 # Print results after all threads complete
-print("\n[+] Fuzzing complete. Results:")
+print(f"\n{timestamp()} [+] Fuzzing complete. Results:")
 for result in FOUND_LIST:
     print(f"[+] Found URL: {result['url']}, Status Code: {result['status_code']}, Length: {result['length']}")
+print(f"[{timestamp()}] Elapsed duration: {elapsed:.2f} seconds")
